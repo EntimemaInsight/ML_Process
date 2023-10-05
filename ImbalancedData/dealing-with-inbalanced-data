@@ -1,0 +1,210 @@
+
+# This Python 3 environment comes with many helpful analytics libraries installed
+# It is defined by the kaggle/python Docker image: https://github.com/kaggle/docker-python
+# For example, here's several helpful packages to load
+
+import numpy as np # linear algebra
+import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+
+# Input data files are available in the read-only "../input/" directory
+# For example, running this (by clicking run or pressing Shift+Enter) will list all files under the input directory
+
+import os
+for dirname, _, filenames in os.walk('/kaggle/input'):
+    for filename in filenames:
+        print(os.path.join(dirname, filename))
+
+# You can write up to 20GB to the current directory (/kaggle/working/) that gets preserved as output when you create a version using "Save & Run All" 
+# You can also write temporary files to /kaggle/temp/, but they won't be saved outside of the current session
+Dealing with Imbalanced Data
+In this notebook, we will go through some of the basic techinques for dealing with imbalanced datasets. This is a companion workbook for the 365 Data Science course on ML Process. This notebook only foucses on implementation. Check out the course or the documentation for the in-depth explanations of each approach.
+
+We will cover:
+
+Random Oversampling
+Random Undersampling
+Synthetic Minority Oversampling (SMOTE)
+Borderline SMOTE
+Adaptive Synthetic Oversampling
+imblearn Documentation: https://imbalanced-learn.org/stable/
+
+On the Data
+This dataset is a good representation of what you may see in the real world. Most data will have some imbalances, and in certain domains you will see a lot of inequality. You will likely see large imbalances in cases of expensive purchases or fraud detection.
+
+#Read in Data 
+df_train = pd.read_csv('/kaggle/input/hr-analytics-job-change-of-data-scientists/aug_train.csv')
+As you can see below, the data is imbalanced with far more 0's than 1's. While there isn't a massive imbalance, using different sampling methods could help improve our model results.
+
+df_train.head()
+df_train.target.value_counts()
+#create validation dataset to see how different sampling methocds could impact model outcomes
+from sklearn.model_selection import train_test_split
+
+X = pd.get_dummies(df_train.drop(['enrollee_id','target'], axis =1))
+y = df_train[['target']]
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+# see imblance in data majority is not looking for a job change (0)
+y_train.value_counts().plot.bar()
+df_train.columns
+# model to validate on 
+Parameters
+For all sampling models
+sampling_strategy: float, str, dict or callable, default=’auto’
+
+float
+- When float, it corresponds to the desired ratio of the number of samples in the minority class over 
+the number of samples in the majority class after resampling. Therefore, the ratio is expressed as 
+\alpha_{os} = N_{rm} / N_{M} where N_{rm} is the number of samples in the minority class after 
+resampling and N_{M} is the number of samples in the majority class.
+str
+
+'minority': resample only the minority class;
+
+'not minority': resample all classes but the minority class;
+
+'not majority': resample all classes but the majority class;
+
+'all': resample all classes;
+
+'auto': equivalent to 'not majority'.
+
+dict
+
+- When dict, the keys correspond to the targeted classes. The values correspond to the desired number
+of samples for each targeted class.
+
+random_state: int, RandomState instance, default=None
+
+int --> Most cases use this to set a consistent random state
+shrinkage: float or dict, default=None
+
+Shrinkage allows us to add slight noise to our data so that our resampled variables don't perfectly overlap. This could be useful for normalization of our results. A good example of how this works is located here: https://imbalanced-learn.org/stable/auto_examples/over-sampling/plot_shrinkage_effect.html
+if None, a normal bootstrap will be generated without perturbation. It is equivalent to shrinkage=0 as well
+if a float is given, the shrinkage factor will be used for all classes to generate the smoothed bootstrap;
+if a dict is given, the shrinkage factor will specific for each class. The key correspond to the targeted class and the value is the shrinkage factor.
+For Smote and Borderline Smote
+k_neighbor: sint or object, default=5
+
+If int, number of nearest neighbours to used to construct synthetic samples. If object, an estimator that inherits from KNeighborsMixin that will be used to find the k_neighbors.
+n_jobs: int, default=None
+
+Number of CPU cores used during the cross-validation loop. None means 1 unless in a joblib.parallel_backend context. -1 means using all processors. See Glossary for more details.
+For Borderline Smote
+kind: {“borderline-1”, “borderline-2”}, default=’borderline-1’
+
+The type of SMOTE algorithm to use one of the following options: 'borderline-1', 'borderline-2'. -Breakdown of difference between borderline-1 and borderline-2: https://sci2s.ugr.es/keel/pdf/specific/congreso/han_borderline_smote.pdf
+Copied from Docs: https://imbalanced-learn.org/stable/references/generated/imblearn.over_sampling.RandomOverSampler.html Smote: https://imbalanced-learn.org/stable/references/generated/imblearn.over_sampling.SMOTE.html Borderline Smote: https://imbalanced-learn.org/stable/references/generated/imblearn.over_sampling.BorderlineSMOTE.html
+
+Random Oversampling
+Random Oversampling is simply randomly picking data points in our minority class and duplicating them.
+
+from imblearn.over_sampling import RandomOverSampler
+
+o_smpl = RandomOverSampler(random_state = 42) 
+
+X_o_smpl, y_o_smpl = o_smpl.fit_resample(X_train,y_train)
+y_o_smpl.value_counts().plot.bar()
+Random Undersampling
+Random Undersampling is simply randomly picking data points in our majority class and removing them.
+
+from imblearn.under_sampling import RandomUnderSampler
+
+u_smpl = RandomUnderSampler(random_state = 42) 
+
+X_u_smpl, y_u_smpl = u_smpl.fit_resample(X_train,y_train)
+#note how many less total rows we have now 
+y_u_smpl.value_counts().plot.bar()
+Synthetic Minority Oversampling (SMOTE)
+Synthetic Minority Oversampling (SMOTE) is an oversampling technique that creates synthetic data points. SMOTE address’ the core problem in oversampling. Oversampling creates duplicate datapoints whereas SMOTE slightly alters these data points.
+
+from imblearn.over_sampling import SMOTE 
+
+smote = SMOTE(random_state = 42) 
+
+X_smote, y_smote = smote.fit_resample(X_train,y_train)
+y_smote.value_counts().plot.bar()
+Borderline Smote
+The idea behind borderline SMOTE is that we only want to use data that’s at risk of being misclassified as the data to be oversampled. In this case, we build a classifier to classify points as positive or negative. Then, for the data points we misclassify, we oversample those data points. This would hopefully train our algorithm to better recognize these difficult instances and correct for them.
+
+from imblearn.over_sampling import BorderlineSMOTE
+
+bsmote = BorderlineSMOTE(random_state = 42) 
+
+X_bsmote, y_bsmote = bsmote.fit_resample(X_train,y_train)
+y_bsmote.value_counts().plot.bar()
+Adaptive Synthetic Oversampling (ADASYN)
+The idea behind AdaSyn is to use a weight distribution of our minority class. Essentially, we give higher weight to instances that are more difficult to learn and lower weight to instances that are easier to learn. AdaSyn is very similar to safe-level SMOTE, except there’s just a different way of computing the synthetic data points.
+
+from imblearn.over_sampling import ADASYN 
+adasyn = ADASYN(random_state = 42) 
+
+X_ada, y_ada = adasyn.fit_resample(X_train,y_train)
+y_ada.value_counts().plot.bar()
+How do these compare?
+Let's quickly compare our sampling techniques by looking at the differences in the sampling data. Then let's compare the results of after feeding them into a model. This is just a little experiment, but it can show how much of a difference sampling can make depending on your data and models.
+
+Let's train a simple random forest on each of the different types of samples, then let's see the difference in validation accuracy.
+
+#let's explore a few variables across these 4 different oversampling techniques across two variables 'city_development_index' and 'training_hours'
+
+print('city_development_index Differences:')
+for i in [X_o_smpl, X_smote, X_bsmote, X_ada]:
+    print(i.mean()['city_development_index'])
+
+print('training_hours Differences:')
+for i in [X_o_smpl, X_smote, X_bsmote, X_ada]:
+    print(i.mean()['training_hours'])
+    
+#what is important here is that there are differences in the sampling of each techinque, not where the differences come in these two variables 
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score
+
+#oversampling model 
+clf_os = RandomForestClassifier(random_state=0)
+clf_os.fit(X_o_smpl, y_o_smpl)
+os_pred = clf_os.predict(X_test)
+
+#undersampling model 
+clf_us = RandomForestClassifier(random_state=0)
+clf_us.fit(X_u_smpl, y_u_smpl)
+us_pred = clf_us.predict(X_test)
+
+#SMOTE 
+clf_sm = RandomForestClassifier(random_state=0)
+clf_sm.fit(X_smote, y_smote)
+sm_pred = clf_sm.predict(X_test)
+
+#borderline SMOTE 
+clf_bsm = RandomForestClassifier(random_state=0)
+clf_bsm.fit(X_bsmote, y_bsmote)
+bsm_pred = clf_bsm.predict(X_test)
+
+#ADDASYN
+clf_ada = RandomForestClassifier(random_state=0)
+clf_ada.fit(X_ada, y_ada)
+ada_pred = clf_ada.predict(X_test)
+
+print('Oversampling Score: %.3f' % accuracy_score(y_test,os_pred))
+print('Undersampling Score: %.3f' % accuracy_score(y_test,us_pred))
+print('SMOTE Score: %.3f '% accuracy_score(y_test,sm_pred))
+print('Borderline SMOTE Score: %.3f'% accuracy_score(y_test,bsm_pred))
+print('ADASYN Score: %.3f'% accuracy_score(y_test,ada_pred))
+clf = RandomForestClassifier(random_state=0)
+clf.fit(X_train, y_train)
+pred = clf_ada.predict(X_test)
+print('No Change Score: %.3f'% accuracy_score(y_test,pred))
+#now let's tune some features in SMOTE to see if we get slightly better results. Let's do this with SMOTE
+for i in range(1,10,1):
+    smote = SMOTE(k_neighbors = i, random_state=42) 
+
+    X_smote, y_smote = smote.fit_resample(X_train,y_train)
+
+    clf_sm = RandomForestClassifier(random_state=0)
+    clf_sm.fit(X_smote, y_smote.values.ravel())
+    sm_pred = clf_sm.predict(X_test)
+    print('K = ' +str(i))
+    print('SMOTE Score: %.3f '% accuracy_score(y_test,sm_pred))
+    
+#it seems like k = 5 produced the best results. 
+ 
